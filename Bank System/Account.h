@@ -14,7 +14,7 @@ typedef struct
     char motherName[50];
     char address[100];
     char accType[20];
-    float balance = 0;
+    float balance;
 } user;
 
 #endif

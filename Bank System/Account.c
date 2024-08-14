@@ -112,6 +112,57 @@ void account()
     fclose(fp);
 }
 
+void checkBalance(user u)
+{
+    printf("\n\nYour current balance is: $%.2f\n", u.balance);
+}
+
+void deposit(user u)
+{
+    FILE *fp;
+    char filename[60];
+    float amount;
+
+    printf("\n\nEnter the amount to deposit: $");
+    scanf("%f", &amount);
+    getchar();
+    u.balance += amount;
+
+    snprintf(filename, sizeof(filename), "%slog.txt", u.username);
+    fp = fopen(filename, "a");
+    if (fp == NULL)
+    {
+        printf("Error opening file!\n");
+        return;
+    }
+
+    fprintf(fp, "Deposited $%.2f\n", amount);
+    fclose(fp);
+}
+
+void withdraw(user u)
+{
+    FILE *fp;
+    char filename[60];
+    float amount;
+
+    printf("\n\nEnter the amount to deposit: $");
+    scanf("%f", &amount);
+    getchar();
+    u.balance -= amount;
+
+    snprintf(filename, sizeof(filename), "%slog.txt", u.username);
+    fp = fopen(filename, "a");
+    if (fp == NULL)
+    {
+        printf("Error opening file!\n");
+        return;
+    }
+
+    fprintf(fp, "Withdrawn $%.2f\n", amount);
+    fclose(fp);
+}
+
 int main()
 {
     account();
