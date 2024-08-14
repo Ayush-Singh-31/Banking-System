@@ -120,7 +120,7 @@ void checkBalance(user u)
     printf("\n\nYour current balance is: $%.2f\n", u.balance);
 }
 
-void deposit(user u)
+void deposit(user *u)
 {
     FILE *fp;
     char filename[60];
@@ -129,41 +129,108 @@ void deposit(user u)
     printf("\n\nEnter the amount to deposit: $");
     scanf("%f", &amount);
     getchar();
-    u.balance += amount;
 
-    snprintf(filename, sizeof(filename), "%slog.txt", u.username);
-    fp = fopen(filename, "a");
+    // Calculate new balance
+    float new_balance = u->balance + amount;
+
+    // Update the balance in the file
+    snprintf(filename, sizeof(filename), "%s.txt", u->username);
+    fp = fopen(filename, "r+");
     if (fp == NULL)
     {
         printf("Error opening file!\n");
         return;
     }
 
+    char line[256];
+    long int position;
+    while (fgets(line, sizeof(line), fp) != NULL)
+    {
+        if (strstr(line, "Balance: $") != NULL)
+        {
+            position = ftell(fp);
+            fseek(fp, position - strlen(line), SEEK_SET);
+            fprintf(fp, "Balance: $%.2f\n", new_balance);
+            break;
+        }
+    }
+    fclose(fp);
+
+    // Update the balance in the struct
+    u->balance = new_balance;
+
+    // Log the transaction
+    snprintf(filename, sizeof(filename), "%slog.txt", u->username);
+    fp = fopen(filename, "a");
+    if (fp == NULL)
+    {
+        printf("Error opening log file!\n");
+        return;
+    }
     fprintf(fp, "Deposited $%.2f\n", amount);
     fclose(fp);
+
+    printf("\n\nDeposit successful! New balance: $%.2f\n", u->balance);
 }
 
-void withdraw(user u)
+void withdraw(user *u)
 {
     FILE *fp;
     char filename[60];
     float amount;
 
-    printf("\n\nEnter the amount to deposit: $");
+    printf("\n\nEnter the amount to withdraw: $");
     scanf("%f", &amount);
     getchar();
-    u.balance -= amount;
 
-    snprintf(filename, sizeof(filename), "%slog.txt", u.username);
-    fp = fopen(filename, "a");
+    // Check if the user has enough balance to withdraw
+    if (amount > u->balance)
+    {
+        printf("\n\nInsufficient balance! Your current balance is $%.2f\n", u->balance);
+        return;
+    }
+
+    // Calculate the new balance
+    float new_balance = u->balance - amount;
+
+    // Update the balance in the file
+    snprintf(filename, sizeof(filename), "%s.txt", u->username);
+    fp = fopen(filename, "r+");
     if (fp == NULL)
     {
         printf("Error opening file!\n");
         return;
     }
 
+    char line[256];
+    long int position;
+    while (fgets(line, sizeof(line), fp) != NULL)
+    {
+        if (strstr(line, "Balance: $") != NULL)
+        {
+            position = ftell(fp);
+            fseek(fp, position - strlen(line), SEEK_SET);
+            fprintf(fp, "Balance: $%.2f\n", new_balance);
+            break;
+        }
+    }
+    fclose(fp);
+
+    // Update the balance in the struct
+    u->balance = new_balance;
+
+    // Log the transaction
+    snprintf(filename, sizeof(filename), "%slog.txt", u->username);
+    fp = fopen(filename, "a");
+    if (fp == NULL)
+    {
+        printf("Error opening log file!\n");
+        return;
+    }
     fprintf(fp, "Withdrawn $%.2f\n", amount);
     fclose(fp);
+
+    printf("\n\nWithdrawal successful! New balance: $%.2f\n", u->balance);
 }
 
 user login()
@@ -304,53 +371,70 @@ void preTransfer()
 
 int main()
 {
-    int choice;
+    int choice1, choice;
 
     printf("\n\nWelcome to the Banking System!\n");
-
-    do
+    printf("\n\n1. Create Account\n2. login\n3. Exit\n");
+    printf("\n\nEnter your choice: ");
+    scanf("%d", &choice1);
+    getchar();
+    while (choice1 < 1 || choice1 > 3)
     {
-        printf("\n\n1. Create Account\n2. Check Balance\n3. Deposit\n4. Withdraw\n5. Transfer\n6. Exit\n");
+        printf("\n\nInvalid choice. Please enter again: ");
+        printf("\n\n1. Create Account\n2. login\n3. Exit\n");
         printf("\n\nEnter your choice: ");
-        scanf("%d", &choice);
+        scanf("%d", &choice1);
         getchar();
+    }
+    if (choice1 == 3)
+    {
+        printf("\n\nThank you for using the Banking System!\n\n");
+        return 0;
+    }
+    if (choice1 == 1)
+    {
+        account();
+    }
+    else
+    {
+        user u = login();
+        do
+        {
+            printf("\n\n1. Check Balance\n2. Deposit\n3. Withdraw\n4. Transfer\n5. Exit\n");
+            printf("\n\nEnter your choice: ");
+            scanf("%d", &choice);
+            getchar();
 
-        if (choice < 1 || choice > 6)
-        {
-            printf("\n\nInvalid choice. Please enter again: ");
-            continue;
-        }
-        if (choice == 1)
-        {
-            account();
-            continue;
-        }
-        else
-        {
-            user u = login();
-            switch (choice)
+            if (choice < 1 || choice > 5)
             {
-            case 2:
-                checkBalance(u);
-                break;
-            case 3:
-                // Open .txt to update
-                deposit(u);
-                break;
-            case 4:
-                withdraw(u);
-                break;
-            case 5:
-                preTransfer();
-                break;
-            case 6:
-                printf("\n\nThank you for using the Banking System!\n\n");
-                break;
-            default:
-                printf("\n\nError!\n\n");
-                break;
+                printf("\n\nInvalid choice. Please enter again: ");
+                continue;
             }
-        }
-    } while (choice != 6);
-    return 0;
+            else
+            {
+                switch (choice)
+                {
+                case 1:
+                    checkBalance(u);
+                    break;
+                case 2:
+                    deposit(&u);
+                    break;
+                case 3:
+                    withdraw(&u);
+                    break;
+                case 4:
+                    preTransfer();
+                    break;
+                case 5:
+                    printf("\n\nThank you for using the Banking System!\n\n");
+                    break;
+                default:
+                    printf("\n\nError!\n\n");
+                    break;
+                }
+            }
+        } while (choice != 5);
+        return 0;
+    }
 }
