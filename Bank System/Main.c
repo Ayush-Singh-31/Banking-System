@@ -115,9 +115,27 @@ void account()
     fclose(fp);
 }
 
-void checkBalance(user u)
+void checkBalance(user *u)
 {
-    printf("\n\nYour current balance is: $%.2f\n", u.balance);
+    char filename[60];
+    snprintf(filename, sizeof(filename), "%s.txt", u->username);
+    FILE *fp = fopen(filename, "r");
+    if (fp == NULL)
+    {
+        printf("Error! Unable to open user file.\n");
+        return;
+    }
+    char line[256];
+    while (fgets(line, sizeof(line), fp) != NULL)
+    {
+        if (strstr(line, "Balance: $") != NULL)
+        {
+            sscanf(line, "Balance: $%f", &u->balance);
+            break;
+        }
+    }
+    fclose(fp);
+    printf("\n\nYour current balance is: $%.2f\n", u->balance);
 }
 
 void deposit(user *u)
@@ -130,10 +148,7 @@ void deposit(user *u)
     scanf("%f", &amount);
     getchar();
 
-    // Calculate new balance
     float new_balance = u->balance + amount;
-
-    // Update the balance in the file
     snprintf(filename, sizeof(filename), "%s.txt", u->username);
     fp = fopen(filename, "r+");
     if (fp == NULL)
@@ -156,10 +171,7 @@ void deposit(user *u)
     }
     fclose(fp);
 
-    // Update the balance in the struct
     u->balance = new_balance;
-
-    // Log the transaction
     snprintf(filename, sizeof(filename), "%slog.txt", u->username);
     fp = fopen(filename, "a");
     if (fp == NULL)
@@ -169,7 +181,6 @@ void deposit(user *u)
     }
     fprintf(fp, "Deposited $%.2f\n", amount);
     fclose(fp);
-
     printf("\n\nDeposit successful! New balance: $%.2f\n", u->balance);
 }
 
@@ -182,18 +193,12 @@ void withdraw(user *u)
     printf("\n\nEnter the amount to withdraw: $");
     scanf("%f", &amount);
     getchar();
-
-    // Check if the user has enough balance to withdraw
     if (amount > u->balance)
     {
         printf("\n\nInsufficient balance! Your current balance is $%.2f\n", u->balance);
         return;
     }
-
-    // Calculate the new balance
     float new_balance = u->balance - amount;
-
-    // Update the balance in the file
     snprintf(filename, sizeof(filename), "%s.txt", u->username);
     fp = fopen(filename, "r+");
     if (fp == NULL)
@@ -201,7 +206,6 @@ void withdraw(user *u)
         printf("Error opening file!\n");
         return;
     }
-
     char line[256];
     long int position;
     while (fgets(line, sizeof(line), fp) != NULL)
@@ -215,11 +219,8 @@ void withdraw(user *u)
         }
     }
     fclose(fp);
-
-    // Update the balance in the struct
     u->balance = new_balance;
 
-    // Log the transaction
     snprintf(filename, sizeof(filename), "%slog.txt", u->username);
     fp = fopen(filename, "a");
     if (fp == NULL)
@@ -229,7 +230,6 @@ void withdraw(user *u)
     }
     fprintf(fp, "Withdrawn $%.2f\n", amount);
     fclose(fp);
-
     printf("\n\nWithdrawal successful! New balance: $%.2f\n", u->balance);
 }
 
@@ -281,46 +281,106 @@ user login()
     return u;
 }
 
-void transferLog(user u1, user u2, int amount)
+void transferLog(user *u1, user *u2, int amount)
 {
-    FILE *fp, *Slog, *rec, *Rlog;
-    char filename[60], logFile[60], recFile[60];
-    fprintf(Slog, "Transfered %d to %s\n", amount, u2.username);
-    fprintf(Rlog, "Received %d from %s\n", amount, u1.username);
+    FILE *Slog, *Rlog;
+    char logFile[60];
+
+    snprintf(logFile, sizeof(logFile), "%slog.txt", u1->username);
+    Slog = fopen(logFile, "a");
+    if (Slog == NULL)
+    {
+        printf("Error opening log file for sender!\n");
+        return;
+    }
+    fprintf(Slog, "Transferred $%d to %s\n", amount, u2->username);
+    fclose(Slog);
+
+    snprintf(logFile, sizeof(logFile), "%slog.txt", u2->username);
+    Rlog = fopen(logFile, "a");
+    if (Rlog == NULL)
+    {
+        printf("Error opening log file for recipient!\n");
+        return;
+    }
+    fprintf(Rlog, "Received $%d from %s\n", amount, u1->username);
+    fclose(Rlog);
 }
 
-void transfer(user u1, user u2)
+// Balance for u2 is not updated
+void transfer(user *u1, user *u2)
 {
-    FILE *fp, *Slog, *rec, *Rlog;
-    char filename[60], logFile[60], recFile[60];
-    int amount;
-
+    float amount;
+    float new_balance;
     printf("\n\nEnter the amount to transfer: $");
-    scanf("%d", &amount);
+    scanf("%f", &amount);
     getchar();
-    if (amount > u1.balance)
+    if (amount > u1->balance)
     {
         printf("Insufficient balance.\n");
         return;
     }
 
-    u1.balance -= amount;
-    u2.balance += amount;
-    fprintf(fp, "Transfered %d to %s\n", amount, u2.username);
+    FILE *fp;
+    char filename[60];
+    new_balance = u1->balance - amount;
+    snprintf(filename, sizeof(filename), "%s.txt", u1->username);
+    fp = fopen(filename, "r+");
+    if (fp == NULL)
+    {
+        printf("Error opening file!\n");
+        return;
+    }
+    char line[256];
+    long int position;
+    while (fgets(line, sizeof(line), fp) != NULL)
+    {
+        if (strstr(line, "Balance: $") != NULL)
+        {
+            position = ftell(fp);
+            fseek(fp, position - strlen(line), SEEK_SET);
+            fprintf(fp, "Balance: $%.2f\n", new_balance);
+            break;
+        }
+    }
+    fclose(fp);
+    u1->balance = new_balance;
+    new_balance = u2->balance + amount;
+    snprintf(filename, sizeof(filename), "%s.txt", u2->username);
+    fp = fopen(filename, "r+");
+    if (fp == NULL)
+    {
+        printf("Error opening file!\n");
+        return;
+    }
+    while (fgets(line, sizeof(line), fp) != NULL)
+    {
+        if (strstr(line, "Balance: $") != NULL)
+        {
+            position = ftell(fp);
+            fseek(fp, position - strlen(line), SEEK_SET);
+            fprintf(fp, "Balance: $%.2f\n", new_balance);
+            break;
+        }
+    }
+    fclose(fp);
+    u2->balance = new_balance;
+
     transferLog(u1, u2, amount);
+    printf("\n\nTransfer successful! New balance: $%.2f\n", u1->balance);
 }
 
-void preTransfer()
+void preTransfer(user *u1)
 {
-    user u1, u2;
-    char username[50];
-    FILE *fp, *Slog, *rec, *Rlog;
-    char filename[60], logFile[60], recFile[60];
+    user u2;
+    char filename[60], recFile[60];
+    FILE *fp, *rec;
 
-    printf("\n\nEnter username: ");
-    fgets(u1.username, sizeof(u1.username), stdin);
-    u1.username[strcspn(u1.username, "\n")] = '\0';
-    snprintf(filename, sizeof(filename), "%s.txt", u1.username);
+    printf("\n\nEnter your username: ");
+    fgets(u1->username, sizeof(u1->username), stdin);
+    u1->username[strcspn(u1->username, "\n")] = '\0';
+
+    snprintf(filename, sizeof(filename), "%s.txt", u1->username);
     fp = fopen(filename, "r");
     if (fp == NULL)
     {
@@ -328,45 +388,25 @@ void preTransfer()
         return;
     }
     fclose(fp);
-    fp = fopen(filename, "a");
-
-    snprintf(logFile, sizeof(filename), "%slog.txt", u1.username);
-    Slog = fopen(logFile, "a");
-    if (Slog == NULL)
-    {
-        printf("Error opening Log file!\n");
-        return;
-    }
 
     printf("\n\n!!!!!TRANSFER MONEY!!!!!");
 
-    printf("\n\nEnter the user ID of the recepient: ");
+    printf("\n\nEnter the username of the recipient: ");
     fgets(u2.username, sizeof(u2.username), stdin);
     u2.username[strcspn(u2.username, "\n")] = '\0';
+
     snprintf(recFile, sizeof(recFile), "%s.txt", u2.username);
     rec = fopen(recFile, "r");
     if (rec == NULL)
     {
-        printf("Error! Recepient not found\n");
+        printf("Error! Recipient not found\n");
         return;
     }
     fclose(rec);
-    rec = fopen(recFile, "a");
 
-    snprintf(logFile, sizeof(recFile), "%slog.txt", u2.username);
-    Rlog = fopen(logFile, "a");
-    if (Rlog == NULL)
-    {
-        printf("Error opening Log file!\n");
-        return;
-    }
+    transfer(u1, &u2);
 
-    transfer(u1, u2);
-
-    fclose(fp);
-    fclose(Slog);
-    fclose(rec);
-    fclose(Rlog);
+    printf("\nTransfer completed successfully!\n");
 }
 
 int main()
@@ -415,7 +455,7 @@ int main()
                 switch (choice)
                 {
                 case 1:
-                    checkBalance(u);
+                    checkBalance(&u);
                     break;
                 case 2:
                     deposit(&u);
@@ -424,7 +464,7 @@ int main()
                     withdraw(&u);
                     break;
                 case 4:
-                    preTransfer();
+                    preTransfer(&u);
                     break;
                 case 5:
                     printf("\n\nThank you for using the Banking System!\n\n");
