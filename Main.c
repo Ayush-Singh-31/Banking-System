@@ -4,31 +4,48 @@
 #include <unistd.h>
 #include "Account.h"
 
+/**
+ * @brief Reads a single character from standard input without echo.
+ *
+ * @return char The input character.
+ */
 char getch()
 {
     char ch;
     struct termios oldt, newt;
+
+    // Save current terminal settings and disable canonical mode and echo
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
     newt.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    // Read character and restore terminal settings
     ch = getchar();
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
     return ch;
 }
 
+/**
+ * @brief Creates a new user account by collecting user information and saving it to a file.
+ */
 void account()
 {
     user u1;
     FILE *fp;
     char filename[60];
+    char ch;
+    int passLength;
 
-    printf("\n\n!!!!!CREATE ACCOUNT!!!!!");
+    printf("\n\n!!!!!CREATE ACCOUNT!!!!!\n");
 
-    printf("\n\nEnter username: ");
+    // Get username
+    printf("Enter username: ");
     fgets(u1.username, sizeof(u1.username), stdin);
     u1.username[strcspn(u1.username, "\n")] = '\0';
 
+    // Create filename and open file for writing
     snprintf(filename, sizeof(filename), "%s.txt", u1.username);
     fp = fopen(filename, "w");
     if (fp == NULL)
@@ -37,70 +54,69 @@ void account()
         return;
     }
 
-    char ch;
-    int i = 0;
-    int passLenght = 20;
-    printf("\n\nPASSWORD can be of length 8 - 20. How long is your password? ");
-    scanf("%d", &passLenght);
-    while (passLenght < 8 || passLenght > 20)
+    // Get password length and validate
+    printf("\nPASSWORD length (8-20): ");
+    scanf("%d", &passLength);
+    while (passLength < 8 || passLength > 20)
     {
-        printf("\n\nPassword length should be between 8 and 20. Please enter again: ");
-        scanf("%d", &passLenght);
+        printf("Invalid length. Enter again (8-20): ");
+        scanf("%d", &passLength);
     }
-    getchar();
-    printf("\n\nPASSWORD: ");
-    for (i = 0; i < passLenght; i++)
+    getchar(); // Clear newline left by scanf
+
+    // Get password with hidden input
+    printf("PASSWORD: ");
+    for (int i = 0; i < passLength; i++)
     {
         ch = getch();
-        if (ch == 13)
+        if (ch == '\n')
             break;
         u1.password[i] = ch;
         printf("*");
     }
-    u1.password[i] = '\0';
+    u1.password[passLength] = '\0';
 
-    printf("\n\nFIRST NAME: ");
+    // Get additional user information
+    printf("\nFIRST NAME: ");
     fgets(u1.fName, sizeof(u1.fName), stdin);
     u1.fName[strcspn(u1.fName, "\n")] = '\0';
 
-    printf("\n\nLAST NAME: ");
+    printf("LAST NAME: ");
     fgets(u1.lName, sizeof(u1.lName), stdin);
     u1.lName[strcspn(u1.lName, "\n")] = '\0';
 
-    printf("\n\nFATHER's NAME: ");
+    printf("FATHER'S NAME: ");
     fgets(u1.fatherName, sizeof(u1.fatherName), stdin);
     u1.fatherName[strcspn(u1.fatherName, "\n")] = '\0';
 
-    printf("\n\nMOTHER's NAME: ");
+    printf("MOTHER'S NAME: ");
     fgets(u1.motherName, sizeof(u1.motherName), stdin);
     u1.motherName[strcspn(u1.motherName, "\n")] = '\0';
 
-    printf("\n\nADDRESS: ");
+    printf("ADDRESS: ");
     fgets(u1.address, sizeof(u1.address), stdin);
     u1.address[strcspn(u1.address, "\n")] = '\0';
 
-    printf("\n\nPHONE NUMBER: ");
+    printf("PHONE NUMBER: ");
     fgets(u1.phoneNum, sizeof(u1.phoneNum), stdin);
     u1.phoneNum[strcspn(u1.phoneNum, "\n")] = '\0';
 
-    printf("\n\nSOCIAL SECURITY NUMBER: ");
+    printf("SOCIAL SECURITY NUMBER: ");
     fgets(u1.ssNum, sizeof(u1.ssNum), stdin);
     u1.ssNum[strcspn(u1.ssNum, "\n")] = '\0';
 
-    printf("\n\nDAY OF BIRTH: ");
+    // Get birth date
+    printf("DAY OF BIRTH: ");
     scanf("%d", &u1.date);
-    getchar();
-
-    printf("\n\nMONTH OF BIRTH: ");
+    printf("MONTH OF BIRTH: ");
     scanf("%d", &u1.month);
-    getchar();
-
-    printf("\n\nYEAR OF BIRTH: ");
+    printf("YEAR OF BIRTH: ");
     scanf("%d", &u1.year);
-    getchar();
+    getchar(); // Clear newline left by scanf
 
-    u1.balance = 0;
+    u1.balance = 0.0;
 
+    // Write user data to file
     fprintf(fp, "Username: %s\n", u1.username);
     fprintf(fp, "Password: %s\n", u1.password);
     fprintf(fp, "First Name: %s\n", u1.fName);
@@ -112,43 +128,64 @@ void account()
     fprintf(fp, "Social Security Number: %s\n", u1.ssNum);
     fprintf(fp, "Date of Birth: %d/%d/%d\n", u1.date, u1.month, u1.year);
     fprintf(fp, "Balance: $%.2f\n", u1.balance);
+
     fclose(fp);
 }
 
+/**
+ * @brief Retrieves and displays the user's balance from their file.
+ *
+ * @param u Pointer to a user struct containing the username.
+ */
 void checkBalance(user *u)
 {
     char filename[60];
+    char line[256];
+    FILE *fp;
+
+    // Construct filename and open file for reading
     snprintf(filename, sizeof(filename), "%s.txt", u->username);
-    FILE *fp = fopen(filename, "r");
+    fp = fopen(filename, "r");
     if (fp == NULL)
     {
         printf("Error! Unable to open user file.\n");
         return;
     }
-    char line[256];
-    while (fgets(line, sizeof(line), fp) != NULL)
+
+    // Search for the balance line and extract balance
+    while (fgets(line, sizeof(line), fp))
     {
-        if (strstr(line, "Balance: $") != NULL)
+        if (strstr(line, "Balance: $"))
         {
             sscanf(line, "Balance: $%f", &u->balance);
             break;
         }
     }
+
+    printf("\nYour current balance is: $%.2f\n", u->balance);
     fclose(fp);
-    printf("\n\nYour current balance is: $%.2f\n", u->balance);
 }
 
+/**
+ * @brief Deposits an amount into the user's account and updates the balance in the file.
+ *
+ * @param u Pointer to a user struct containing the username and current balance.
+ */
 void deposit(user *u)
 {
     FILE *fp;
     char filename[60];
     float amount;
 
-    printf("\n\nEnter the amount to deposit: $");
+    // Get deposit amount from user
+    printf("\nEnter the amount to deposit: $");
     scanf("%f", &amount);
     getchar();
 
+    // Update balance
     float new_balance = u->balance + amount;
+
+    // Open user's file to update balance
     snprintf(filename, sizeof(filename), "%s.txt", u->username);
     fp = fopen(filename, "r+");
     if (fp == NULL)
@@ -158,10 +195,12 @@ void deposit(user *u)
     }
 
     char line[256];
-    long int position;
-    while (fgets(line, sizeof(line), fp) != NULL)
+    long position;
+
+    // Find and update the balance line
+    while (fgets(line, sizeof(line), fp))
     {
-        if (strstr(line, "Balance: $") != NULL)
+        if (strstr(line, "Balance: $"))
         {
             position = ftell(fp);
             fseek(fp, position - strlen(line), SEEK_SET);
@@ -169,9 +208,13 @@ void deposit(user *u)
             break;
         }
     }
+
     fclose(fp);
 
+    // Update user's balance in memory
     u->balance = new_balance;
+
+    // Log the transaction
     snprintf(filename, sizeof(filename), "%slog.txt", u->username);
     fp = fopen(filename, "a");
     if (fp == NULL)
@@ -181,24 +224,38 @@ void deposit(user *u)
     }
     fprintf(fp, "Deposited $%.2f\n", amount);
     fclose(fp);
-    printf("\n\nDeposit successful! New balance: $%.2f\n", u->balance);
+
+    // Notify user of successful deposit
+    printf("\nDeposit successful! New balance: $%.2f\n", u->balance);
 }
 
+/**
+ * @brief Withdraws an amount from the user's account and updates the balance in the file.
+ *
+ * @param u Pointer to a user struct containing the username and current balance.
+ */
 void withdraw(user *u)
 {
     FILE *fp;
     char filename[60];
     float amount;
 
-    printf("\n\nEnter the amount to withdraw: $");
+    // Get withdrawal amount from user
+    printf("\nEnter the amount to withdraw: $");
     scanf("%f", &amount);
     getchar();
+
+    // Check if sufficient balance is available
     if (amount > u->balance)
     {
-        printf("\n\nInsufficient balance! Your current balance is $%.2f\n", u->balance);
+        printf("\nInsufficient balance! Your current balance is $%.2f\n", u->balance);
         return;
     }
+
+    // Update balance
     float new_balance = u->balance - amount;
+
+    // Open user's file to update balance
     snprintf(filename, sizeof(filename), "%s.txt", u->username);
     fp = fopen(filename, "r+");
     if (fp == NULL)
@@ -206,11 +263,14 @@ void withdraw(user *u)
         printf("Error opening file!\n");
         return;
     }
+
     char line[256];
-    long int position;
-    while (fgets(line, sizeof(line), fp) != NULL)
+    long position;
+
+    // Find and update the balance line
+    while (fgets(line, sizeof(line), fp))
     {
-        if (strstr(line, "Balance: $") != NULL)
+        if (strstr(line, "Balance: $"))
         {
             position = ftell(fp);
             fseek(fp, position - strlen(line), SEEK_SET);
@@ -218,9 +278,13 @@ void withdraw(user *u)
             break;
         }
     }
+
     fclose(fp);
+
+    // Update user's balance in memory
     u->balance = new_balance;
 
+    // Log the transaction
     snprintf(filename, sizeof(filename), "%slog.txt", u->username);
     fp = fopen(filename, "a");
     if (fp == NULL)
@@ -230,18 +294,26 @@ void withdraw(user *u)
     }
     fprintf(fp, "Withdrawn $%.2f\n", amount);
     fclose(fp);
-    printf("\n\nWithdrawal successful! New balance: $%.2f\n", u->balance);
+
+    // Notify user of successful withdrawal
+    printf("\nWithdrawal successful! New balance: $%.2f\n", u->balance);
 }
 
+/**
+ * @brief Logs in a user by verifying their credentials.
+ *
+ * @return user Struct containing user information if login is successful; otherwise, an empty user struct.
+ */
 user login()
 {
-    user u;
+    user u = {0}; // Initialize user struct with zeros
     FILE *fp;
     char filename[60];
     char username[50];
     char password[20];
 
-    printf("\n\nEnter username: ");
+    // Get username
+    printf("\nEnter username: ");
     fgets(username, sizeof(username), stdin);
     username[strcspn(username, "\n")] = '\0';
 
@@ -253,10 +325,12 @@ user login()
         return u;
     }
 
-    printf("\n\nEnter password: ");
+    // Get password
+    printf("Enter password: ");
     fgets(password, sizeof(password), stdin);
     password[strcspn(password, "\n")] = '\0';
 
+    // Read user data from file
     fscanf(fp, "Username: %s\n", u.username);
     fscanf(fp, "Password: %s\n", u.password);
     fscanf(fp, "First Name: %s\n", u.fName);
@@ -269,10 +343,10 @@ user login()
     fscanf(fp, "Date of Birth: %d/%d/%d\n", &u.date, &u.month, &u.year);
     fscanf(fp, "Balance: $%f\n", &u.balance);
 
+    // Validate password
     while (strcmp(password, u.password) != 0)
     {
-        printf("\n\nInvalid password!\n");
-        printf("\n\nTry Again: ");
+        printf("Invalid password! Try Again: ");
         fgets(password, sizeof(password), stdin);
         password[strcspn(password, "\n")] = '\0';
     }
@@ -281,118 +355,155 @@ user login()
     return u;
 }
 
-void transferLog(user *u1, user *u2, int amount)
+/**
+ * @brief Logs a transfer transaction for both the sender and recipient.
+ *
+ * @param u1 Pointer to the sender's user struct.
+ * @param u2 Pointer to the recipient's user struct.
+ * @param amount The amount transferred.
+ */
+void transferLog(user *u1, user *u2, float amount)
 {
-    FILE *Slog, *Rlog;
+    FILE *log;
     char logFile[60];
 
+    // Log sender's transaction
     snprintf(logFile, sizeof(logFile), "%slog.txt", u1->username);
-    Slog = fopen(logFile, "a");
-    if (Slog == NULL)
+    log = fopen(logFile, "a");
+    if (log)
+    {
+        fprintf(log, "Transferred $%.2f to %s\n", amount, u2->username);
+        fclose(log);
+    }
+    else
     {
         printf("Error opening log file for sender!\n");
-        return;
     }
-    fprintf(Slog, "Transferred $%d to %s\n", amount, u2->username);
-    fclose(Slog);
 
+    // Log recipient's transaction
     snprintf(logFile, sizeof(logFile), "%slog.txt", u2->username);
-    Rlog = fopen(logFile, "a");
-    if (Rlog == NULL)
+    log = fopen(logFile, "a");
+    if (log)
+    {
+        fprintf(log, "Received $%.2f from %s\n", amount, u1->username);
+        fclose(log);
+    }
+    else
     {
         printf("Error opening log file for recipient!\n");
-        return;
     }
-    fprintf(Rlog, "Received $%d from %s\n", amount, u1->username);
-    fclose(Rlog);
 }
 
+/**
+ * @brief Transfers money from one user to another and updates their balances.
+ *
+ * @param u1 Pointer to the sender's user struct.
+ * @param u2 Pointer to the recipient's user struct.
+ */
 void transfer(user *u1, user *u2)
 {
     float amount;
-    float new_balance;
-    printf("\n\nEnter the amount to transfer: $");
+
+    // Get transfer amount
+    printf("\nEnter the amount to transfer: $");
     scanf("%f", &amount);
     getchar();
-    printf("%f", u1->balance);
+
     if (amount > u1->balance)
     {
         printf("Insufficient balance.\n");
         return;
     }
 
-    FILE *fp1, *fp;
+    // Update sender's balance
+    FILE *fp;
     char filename[60];
-    new_balance = u1->balance - amount;
-    u1->balance = new_balance;
+    u1->balance -= amount;
     snprintf(filename, sizeof(filename), "%s.txt", u1->username);
-    fp1 = fopen(filename, "r+");
-    if (fp1 == NULL)
+    fp = fopen(filename, "r+");
+    if (fp)
     {
-        printf("Error opening file!\n");
+        char line[256];
+        long position;
+        while (fgets(line, sizeof(line), fp))
+        {
+            if (strstr(line, "Balance: $"))
+            {
+                position = ftell(fp);
+                fseek(fp, position - strlen(line), SEEK_SET);
+                fprintf(fp, "Balance: $%.2f\n", u1->balance);
+                break;
+            }
+        }
+        fclose(fp);
+    }
+    else
+    {
+        printf("Error opening file for sender!\n");
         return;
     }
-    char line[256];
-    long int position;
-    while (fgets(line, sizeof(line), fp1) != NULL)
-    {
-        if (strstr(line, "Balance: $") != NULL)
-        {
-            position = ftell(fp1);
-            fseek(fp1, position - strlen(line), SEEK_SET);
-            fprintf(fp1, "Balance: $%.2f\n", new_balance);
-            break;
-        }
-    }
-    fclose(fp1);
 
-    new_balance = u2->balance + amount;
-    u2->balance = new_balance;
+    // Update recipient's balance
+    u2->balance += amount;
     snprintf(filename, sizeof(filename), "%s.txt", u2->username);
     fp = fopen(filename, "r+");
-    if (fp == NULL)
+    if (fp)
     {
-        printf("Error opening file!\n");
+        char line[256];
+        long position;
+        while (fgets(line, sizeof(line), fp))
+        {
+            if (strstr(line, "Balance: $"))
+            {
+                position = ftell(fp);
+                fseek(fp, position - strlen(line), SEEK_SET);
+                fprintf(fp, "Balance: $%.2f\n", u2->balance);
+                break;
+            }
+        }
+        fclose(fp);
+    }
+    else
+    {
+        printf("Error opening file for recipient!\n");
         return;
     }
-    while (fgets(line, sizeof(line), fp) != NULL)
-    {
-        if (strstr(line, "Balance: $") != NULL)
-        {
-            position = ftell(fp);
-            fseek(fp, position - strlen(line), SEEK_SET);
-            fprintf(fp, "Balance: $%.2f\n", new_balance);
-            break;
-        }
-    }
-    fclose(fp);
 
+    // Log the transaction
     transferLog(u1, u2, amount);
-    printf("\n\nTransfer successful! New balance: $%.2f\n", u1->balance);
+    printf("\nTransfer successful! New balance: $%.2f\n", u1->balance);
 }
 
+/**
+ * @brief Handles the pre-transfer process, including recipient validation.
+ *
+ * @param u1 Pointer to the sender's user struct.
+ */
 void preTransfer(user *u1)
 {
     user u2;
-    char filename[60], recFile[60];
+    char filename[60];
     FILE *rec;
 
-    printf("\n\n!!!!!TRANSFER MONEY!!!!!");
+    printf("\n\n!!!!!TRANSFER MONEY!!!!!\n");
 
-    printf("\n\nEnter the username of the recipient: ");
+    // Get recipient username
+    printf("\nEnter the username of the recipient: ");
     fgets(u2.username, sizeof(u2.username), stdin);
     u2.username[strcspn(u2.username, "\n")] = '\0';
 
-    snprintf(recFile, sizeof(recFile), "%s.txt", u2.username);
-    rec = fopen(recFile, "r");
-    if (rec == NULL)
+    snprintf(filename, sizeof(filename), "%s.txt", u2.username);
+    rec = fopen(filename, "r");
+    if (rec)
+    {
+        fclose(rec);
+        transfer(u1, &u2);
+        printf("\nTransfer completed successfully!\n");
+    }
+    else
     {
         printf("Error! Recipient not found\n");
-        return;
     }
-    transfer(u1, &u2);
-    fclose(rec);
-    printf("\nTransfer completed successfully!\n");
 }
 
 int main()
@@ -400,23 +511,27 @@ int main()
     int choice1, choice;
 
     printf("\n\nWelcome to the Banking System!\n");
-    printf("\n\n1. Create Account\n2. login\n3. Exit\n");
-    printf("\n\nEnter your choice: ");
+    printf("\n1. Create Account\n2. Login\n3. Exit\n");
+    printf("\nEnter your choice: ");
     scanf("%d", &choice1);
     getchar();
+
+    // Validate initial choice
     while (choice1 < 1 || choice1 > 3)
     {
-        printf("\n\nInvalid choice. Please enter again: ");
-        printf("\n\n1. Create Account\n2. login\n3. Exit\n");
-        printf("\n\nEnter your choice: ");
+        printf("\nInvalid choice. Please enter again: ");
+        printf("\n1. Create Account\n2. Login\n3. Exit\n");
+        printf("\nEnter your choice: ");
         scanf("%d", &choice1);
         getchar();
     }
+
     if (choice1 == 3)
     {
-        printf("\n\nThank you for using the Banking System!\n\n");
+        printf("\nThank you for using the Banking System!\n");
         return 0;
     }
+
     if (choice1 == 1)
     {
         account();
@@ -426,41 +541,41 @@ int main()
         user u = login();
         do
         {
-            printf("\n\n1. Check Balance\n2. Deposit\n3. Withdraw\n4. Transfer\n5. Exit\n");
-            printf("\n\nEnter your choice: ");
+            printf("\n1. Check Balance\n2. Deposit\n3. Withdraw\n4. Transfer\n5. Exit\n");
+            printf("\nEnter your choice: ");
             scanf("%d", &choice);
             getchar();
 
+            // Validate user choice
             if (choice < 1 || choice > 5)
             {
-                printf("\n\nInvalid choice. Please enter again: ");
+                printf("\nInvalid choice. Please enter again.\n");
                 continue;
             }
-            else
+
+            switch (choice)
             {
-                switch (choice)
-                {
-                case 1:
-                    checkBalance(&u);
-                    break;
-                case 2:
-                    deposit(&u);
-                    break;
-                case 3:
-                    withdraw(&u);
-                    break;
-                case 4:
-                    preTransfer(&u);
-                    break;
-                case 5:
-                    printf("\n\nThank you for using the Banking System!\n\n");
-                    break;
-                default:
-                    printf("\n\nError!\n\n");
-                    break;
-                }
+            case 1:
+                checkBalance(&u);
+                break;
+            case 2:
+                deposit(&u);
+                break;
+            case 3:
+                withdraw(&u);
+                break;
+            case 4:
+                preTransfer(&u);
+                break;
+            case 5:
+                printf("\nThank you for using the Banking System!\n");
+                break;
+            default:
+                printf("\nError!\n");
+                break;
             }
         } while (choice != 5);
-        return 0;
     }
+
+    return 0;
 }
