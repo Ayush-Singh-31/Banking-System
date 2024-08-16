@@ -307,7 +307,6 @@ void transferLog(user *u1, user *u2, int amount)
     fclose(Rlog);
 }
 
-// Balance for u2 is not updated
 void transfer(user *u1, user *u2)
 {
     float amount;
@@ -315,37 +314,40 @@ void transfer(user *u1, user *u2)
     printf("\n\nEnter the amount to transfer: $");
     scanf("%f", &amount);
     getchar();
+    printf("%f", u1->balance);
     if (amount > u1->balance)
     {
         printf("Insufficient balance.\n");
         return;
     }
 
-    FILE *fp;
+    FILE *fp1, *fp;
     char filename[60];
     new_balance = u1->balance - amount;
+    u1->balance = new_balance;
     snprintf(filename, sizeof(filename), "%s.txt", u1->username);
-    fp = fopen(filename, "r+");
-    if (fp == NULL)
+    fp1 = fopen(filename, "r+");
+    if (fp1 == NULL)
     {
         printf("Error opening file!\n");
         return;
     }
     char line[256];
     long int position;
-    while (fgets(line, sizeof(line), fp) != NULL)
+    while (fgets(line, sizeof(line), fp1) != NULL)
     {
         if (strstr(line, "Balance: $") != NULL)
         {
-            position = ftell(fp);
-            fseek(fp, position - strlen(line), SEEK_SET);
-            fprintf(fp, "Balance: $%.2f\n", new_balance);
+            position = ftell(fp1);
+            fseek(fp1, position - strlen(line), SEEK_SET);
+            fprintf(fp1, "Balance: $%.2f\n", new_balance);
             break;
         }
     }
-    fclose(fp);
-    u1->balance = new_balance;
+    fclose(fp1);
+
     new_balance = u2->balance + amount;
+    u2->balance = new_balance;
     snprintf(filename, sizeof(filename), "%s.txt", u2->username);
     fp = fopen(filename, "r+");
     if (fp == NULL)
@@ -364,7 +366,6 @@ void transfer(user *u1, user *u2)
         }
     }
     fclose(fp);
-    u2->balance = new_balance;
 
     transferLog(u1, u2, amount);
     printf("\n\nTransfer successful! New balance: $%.2f\n", u1->balance);
@@ -374,20 +375,7 @@ void preTransfer(user *u1)
 {
     user u2;
     char filename[60], recFile[60];
-    FILE *fp, *rec;
-
-    printf("\n\nEnter your username: ");
-    fgets(u1->username, sizeof(u1->username), stdin);
-    u1->username[strcspn(u1->username, "\n")] = '\0';
-
-    snprintf(filename, sizeof(filename), "%s.txt", u1->username);
-    fp = fopen(filename, "r");
-    if (fp == NULL)
-    {
-        printf("Error! User not found\n");
-        return;
-    }
-    fclose(fp);
+    FILE *rec;
 
     printf("\n\n!!!!!TRANSFER MONEY!!!!!");
 
@@ -402,10 +390,8 @@ void preTransfer(user *u1)
         printf("Error! Recipient not found\n");
         return;
     }
-    fclose(rec);
-
     transfer(u1, &u2);
-
+    fclose(rec);
     printf("\nTransfer completed successfully!\n");
 }
 
